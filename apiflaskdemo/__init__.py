@@ -3,6 +3,7 @@ from apiflaskdemo.project.models import db, Alumno, User
 from apiflaskdemo.project.blueprints import abc_alumnos
 from apiflaskdemo.project.auth.blueprints import auth_bp
 from sqlalchemy import inspect
+from data.alumnos import data_alumnos as alumnos
 
 def create_app():
     '''Función principal de la aplicación'''
@@ -15,24 +16,16 @@ def create_app():
     # Se incializa la conexión entre SQLALchemy y la base de datos
     db.init_app(app) 
     
-    with app.app_context():
-        '''Función encargada de verificar que exista una base de datos  con
-           las tablas de alumnos y de usuarios pobladas correctamente. 
-            En caso de no existir, es creada'''
-         
-        # Verifica que exista la tabla alumno en la base de datos
-        inspector = inspect(db.engine)
-        if not inspector.has_table('alumno'):
-            # Crea y llena la base de alumno.
+    if app.config["TESTING"]:
+        with app.app_context():
+            # Elimina la base de datos si existe
+            db.drop_all()
+            # Crea la base de datos
             db.create_all()
-            with open(app.config['PATH'] + "/../data/alumnos.txt", "rt") as f:
-                alumnos = eval(f.read())
-                for alumno in alumnos:
-                    if Alumno.query.filter_by(cuenta=alumno["cuenta"]).first():
-                        continue
-                    else:
-                        db.session.add(Alumno(**alumno))
-                db.session.commit()
+            # Inserta los datos de prueba
+            for alumno in alumnos:
+                db.session.add(Alumno(**alumno))
+            db.session.commit()
                 
             # Verifica que exista el usuario admin y lo crea si no es así 
             if not User.query.filter_by(username="admin").first():

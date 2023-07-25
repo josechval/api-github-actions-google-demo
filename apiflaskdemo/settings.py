@@ -2,7 +2,7 @@
 import os
 
 DEBUG = True
-TESTING = False
+TESTING = True
 PATH = os.path.dirname(os.path.abspath(__file__))
 ENV = "development"
 SECURITY_PASSWORD_SALT = 'ultra-secreto'
