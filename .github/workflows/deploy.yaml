@@ -1,0 +1,51 @@
+name: Deploy to Cloud Run and Infrastructure
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  deploy:
+    name: Deploy Application and Infrastructure
+    runs-on: ubuntu-latest
+
+    env:
+      GCP_PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
+      GCP_CREDENTIALS: ${{ secrets.GCP_CREDENTIALS }}
+      DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v2
+
+      - name: Set up Google Cloud SDK
+        uses: google-github-actions/setup-gcloud@master
+        with:
+          service_account_key: ${{ secrets.GCP_CREDENTIALS }}
+          project_id: ${{ secrets.GCP_PROJECT_ID }}
+          export_default_credentials: true
+
+      - name: Create PostgreSQL Instance
+        run: |
+          gcloud sql instances create your-sql-instance \
+            --database-version=POSTGRES_13 \
+            --tier=db-f1-micro \
+            --region=us-central1
+          gcloud sql databases create your-database --instance=your-sql-instance
+
+      - name: Initialize Terraform
+        run: |
+          cd terraform/
+          terraform init
+          terraform validate
+          terraform apply -auto-approve -var="gcp_credentials=${{ secrets.GCP_CREDENTIALS }}" -var="db_password=${{ secrets.DB_PASSWORD }}"
+
+      - name: Build Docker Image
+        run: |
+          docker build -t gcr.io/${{ secrets.GCP_PROJECT_ID }}/your-app-name:latest .
+          docker push gcr.io/${{ secrets.GCP_PROJECT_ID }}/your-app-name:latest
+
+      - name: Deploy to Cloud Run
+        run: |
+          gcloud run deploy your-service-name --image=gcr.io/${{ secrets.GCP_PROJECT_ID }}/your-app-name:latest --platform=managed --region=us-central1 --allow-unauthenticated
